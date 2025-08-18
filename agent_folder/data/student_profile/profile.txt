@@ -1,0 +1,11 @@
+Anastasiia Dynia was born on May 14th, 2003, and grew up with an insatiable curiosity for how technology shapes the world. From an early age, she would take apart gadgets just to see what made them work, a habit that would eventually evolve into a passion for building intelligent systems.
+
+Today, she is pursuing a degree in Information Technologies & Business Analytics at the Ukrainian Catholic University (UCU). Her program has given her the perfect balance between the mathematical foundations of computer science and the strategic thinking of business analytics, enabling her to approach problems from both a technical and a practical perspective.
+
+Her academic journey is powered by a fascination with machine learning, computer vision, and generative models. She spends hours experimenting with algorithms, refining model architectures, and exploring new research. Fluent in Ukrainian, proficient in English at a C1 level, and able to read Polish, Anastasiia moves effortlessly across cultures and languages — a skill that helps her collaborate in international research projects and communicate complex ideas to diverse audiences.
+
+Outside the classroom, she has already made notable achievements: building a binary classifier to detect image artifacts, deploying real-time data pipelines using Kafka, Spark Streaming, and Cassandra, and serving as a key organizer for tech and academic events at UCU. She is equally at home debugging Python code, managing data flow in distributed systems, or presenting findings to a room of peers.
+
+Anastasiia’s drive doesn’t stop at coursework or projects. She actively seeks opportunities to mentor younger students, contribute to open-source initiatives, and stay on top of cutting-edge trends in AI. She believes that the most exciting breakthroughs happen at the intersection of disciplines, where technology, creativity, and human insight meet.
+
+Whether she’s refining a diffusion model, leading a workshop, or diving deep into a complex dataset, Anastasiia approaches every challenge with focus, adaptability, and a desire to create technology that truly matters. For her, innovation is not just about solving problems — it’s about shaping the future.
