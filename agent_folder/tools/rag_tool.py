@@ -1,55 +1,35 @@
 import os
 import json
+from typing import Dict, List, Any, Optional
+
+import requests
+from dotenv import load_dotenv
+
 from pydantic import BaseModel, Field
-
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import StructuredTool
-
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 
-from dotenv import load_dotenv
 load_dotenv()
 
-VECTOR_DIR = os.getenv("VECTOR_DIR", ".faiss_vs")
-INDEX_NAME = os.getenv("INDEX_NAME", "student_index")
-INDEX_PATH = os.path.join(VECTOR_DIR, INDEX_NAME)
-PROVIDER = (os.getenv("EMBEDDINGS_PROVIDER") or "openai").lower()
-EMB_MODEL = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
-
-class RAGArgs(BaseModel):
-    question: str = Field(...)
-
-def emb():
-    if PROVIDER == "openai":
-        return OpenAIEmbeddings(model=EMB_MODEL)
-    hf_model = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    return HuggingFaceEmbeddings(model_name=hf_model)
-
-def base_retriever():
-    store = FAISS.load_local(INDEX_PATH, emb(), allow_dangerous_deserialization=True)
-    return store.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": 6, "fetch_k": 20, "lambda_mult": 0.5}
-    )
-
-def compressed_retriever():
-    llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    llm = ChatOpenAI(model=llm_model, temperature=0)
-    compressor = LLMChainExtractor.from_llm(llm)
-    return ContextualCompressionRetriever(
-        base_compressor=compressor,
-        base_retriever=base_retriever(),
-    )
+SERVICE_MODE: str = (os.getenv("SERVICE_MODE") or "local").lower()
+RAG_URL: Optional[str] = os.getenv("RAG_URL")
+LLM_MODEL: str = os.getenv("LLM_MODEL")
+VECTOR_DIR: str = os.getenv("VECTOR_DIR")
+INDEX_NAME: str = os.getenv("INDEX_NAME")
+INDEX_PATH: str = os.path.join(VECTOR_DIR, INDEX_NAME)
+PROVIDER: str = (os.getenv("EMBEDDINGS_PROVIDER") or "openai").lower()
+EMB_MODEL: Optional[str] = os.getenv("EMBEDDINGS_MODEL")
+HF_EMBED_MODEL: str = os.getenv("HF_EMBED_MODEL")
 
 PROMPT = ChatPromptTemplate.from_template(
     "Use ONLY the provided context. Do NOT invent information.\n\n"
     "If the context is rich, answer concisely.\n"
-    "If the context is sparse (few details available), explicitly acknowledge it by starting with:\n"
+    "If the context is sparse, start with one of:\n"
     "'From the context, I only know that...' or 'I do not have much information, only that...'\n"
     "Then list the available facts.\n\n"
     "Question: {q}\n"
@@ -57,43 +37,77 @@ PROMPT = ChatPromptTemplate.from_template(
     "Final Answer:"
 )
 
-def rag_answer(question: str) -> dict:
-    if not os.path.exists(INDEX_PATH) and not os.path.exists(INDEX_PATH + ".faiss"):
+class RAGArgs(BaseModel):
+    question: str = Field(..., description="The user's question about the student.")
+
+def _embeddings():
+    if PROVIDER == "openai":
+        return OpenAIEmbeddings(model=EMB_MODEL)
+    return HuggingFaceEmbeddings(model_name=HF_EMBED_MODEL)
+
+def _index_present() -> bool:
+    if not os.path.isdir(INDEX_PATH):
+        return False
+    return (
+        os.path.exists(os.path.join(INDEX_PATH, "index.faiss"))
+        and os.path.exists(os.path.join(INDEX_PATH, "index.pkl"))
+    )
+
+def rag_local(question: str) -> Dict[str, Any]:
+    if not _index_present():
         return {"answer": "RAG index not found. Please run ingestion.", "sources": []}
 
-    retriever = compressed_retriever()
-    docs = retriever.invoke(question)
+    store = FAISS.load_local(
+        INDEX_PATH,
+        _embeddings(),
+        allow_dangerous_deserialization=True,
+    )
 
+    base = store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": 6, "fetch_k": 20, "lambda_mult": 0.5},
+    )
+
+    llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
+    compressor = LLMChainExtractor.from_llm(llm)
+    retriever = ContextualCompressionRetriever(
+        base_compressor=compressor, base_retriever=base
+    )
+
+    docs = retriever.invoke(question) or []
     if len(docs) < 2:
-        base = base_retriever()
-        docs = base.invoke(question)
+        docs = base.invoke(question) or []
 
-    chunks, sources = [], []
+    chunks: List[str] = []
+    sources: List[Dict[str, Any]] = []
     for d in docs:
         chunks.append(d.page_content)
-        sources.append({"metadata": d.metadata})
+        src = d.metadata.get("source") if isinstance(d.metadata, dict) else None
+        sources.append({"source": src})
 
     ctx = "\n\n".join(chunks)
-
-    llm_model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    llm = ChatOpenAI(model=llm_model, temperature=0)
     msg = PROMPT.invoke({"q": question, "ctx": ctx})
     out = llm.invoke(msg)
 
-    return {
-        "answer": out.content,
-        "sources": sources,
-    }
+    return {"answer": out.content, "sources": sources}
+
+def rag_remote(question: str) -> Dict[str, Any]:
+    if not RAG_URL:
+        return {"answer": "RAG_URL is not configured.", "sources": []}
+    resp = requests.post(RAG_URL, json={"question": question}, timeout=20)
+    resp.raise_for_status()
+    data = resp.json()
+    return {"answer": data.get("answer", ""), "sources": data.get("sources", [])}
+
+def rag_answer(question: str) -> Dict[str, Any]:
+    return rag_remote(question) if SERVICE_MODE == "remote" else rag_local(question)
 
 def tool_fn(question: str) -> str:
     return json.dumps(rag_answer(question), ensure_ascii=False)
 
 student_rag_tool = StructuredTool.from_function(
     name="student_rag",
-    description="Useful when the user has factual questions about the student, "
-                "such as birth date, university, program, projects, achievements, languages, etc. "
-                "Answer strictly from retrieved context. "
-                "Do NOT use for emotion/sentiment analysis.",
+    description="Answer factual questions about the student strictly from retrieved context.",
     func=tool_fn,
     args_schema=RAGArgs,
 )

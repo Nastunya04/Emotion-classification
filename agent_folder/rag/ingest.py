@@ -10,10 +10,10 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 load_dotenv()
 
 PROVIDER = (os.getenv("EMBEDDINGS_PROVIDER") or "openai").lower()
-EMB_MODEL = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
-DATA_DIR = os.getenv("DATA_DIR", "data/student_profile")
-VECTOR_DIR = os.getenv("VECTOR_DIR", ".faiss_vs")
-INDEX_NAME = os.getenv("INDEX_NAME", "student_index")
+EMB_MODEL = os.getenv("EMBEDDINGS_MODEL")
+DATA_DIR = os.getenv("DATA_DIR")
+VECTOR_DIR = os.getenv("VECTOR_DIR")
+INDEX_NAME = os.getenv("INDEX_NAME")
 INDEX_PATH = os.path.join(VECTOR_DIR, INDEX_NAME)
 
 def get_embeddings():

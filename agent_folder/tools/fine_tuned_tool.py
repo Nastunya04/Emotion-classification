@@ -1,122 +1,94 @@
 import os
 import json
-import torch
+from typing import Dict, Any, Optional
+
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from langchain_core.tools import StructuredTool
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-
-from dotenv import load_dotenv
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import requests
 
 load_dotenv()
 
-HF_REPO_ID = os.getenv("HF_REPO_ID")
+SERVICE_MODE: str = (os.getenv("SERVICE_MODE") or "local").lower()
+EMOTION_URL: Optional[str] = os.getenv("EMOTION_URL")
+LLM_MODEL: str = os.getenv("LLM_MODEL")
+HF_REPO_ID: Optional[str] = os.getenv("HF_REPO_ID")
 ENV_LABELS = [s.strip() for s in (os.getenv("EMOTION_LABELS") or "").split(",") if s.strip()]
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = None
-tokenizer = None
-labels = None
-
+FORMAT_PROMPT = ChatPromptTemplate.from_template(
+    "Summarize this emotion classification for a user.\nLabel: {label}\nConfidence: {confidence}\nReturn one short sentence."
+)
 
 class EmotionArgs(BaseModel):
     text: str = Field(...)
 
+_tokenizer = None
+_model = None
+_labels = None
 
-def resolve_labels():
-    #will change this function, since for now I do not have label names in the config of the model
-    #and need to resolve this manually
-    global labels
-    if labels is not None:
-        return labels
-
-    cfg = model.config
-    num = getattr(cfg, "num_labels", None)
-
-    if not num:
-        if isinstance(getattr(cfg, "id2label", None), dict):
-            num = len(cfg.id2label)
-        elif isinstance(getattr(cfg, "label2id", None), dict):
-            try:
-                num = 1 + max(cfg.label2id.values())
-            except Exception:
-                num = len(cfg.label2id) or 0
-
-    if ENV_LABELS and num and len(ENV_LABELS) == num:
-        labels = ENV_LABELS
-        return labels
-
-    id2label = getattr(cfg, "id2label", None)
-    if isinstance(id2label, dict) and num:
-        names = []
-        for i in range(num):
-            name = id2label.get(i) or id2label.get(str(i))
-            if name is None:
-                label2id = getattr(cfg, "label2id", None)
-                if isinstance(label2id, dict):
-                    for k, v in label2id.items():
-                        if v == i:
-                            name = k
-                            break
-            names.append(name if name is not None else f"LABEL_{i}")
-        labels = names
-        return labels
-
-    label2id = getattr(cfg, "label2id", None)
-    if isinstance(label2id, dict) and num:
-        inv = {v: k for k, v in label2id.items()}
-        labels = [inv.get(i, f"LABEL_{i}") for i in range(num)]
-        return labels
-
-    labels = [f"LABEL_{i}" for i in range(num or 0)]
-    return labels
-
-
-def load_from_hf():
-    global model, tokenizer, labels
-    if model is not None:
+def _load_local_model():
+    global _tokenizer, _model, _labels
+    if _model is not None:
         return
     if not HF_REPO_ID:
         raise EnvironmentError("HF_REPO_ID is not set")
-    tokenizer = AutoTokenizer.from_pretrained(HF_REPO_ID)
-    model = AutoModelForSequenceClassification.from_pretrained(HF_REPO_ID)
-    model.to(device).eval()
-    labels = None
-    resolve_labels()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    _tokenizer = AutoTokenizer.from_pretrained(HF_REPO_ID)
+    _model = AutoModelForSequenceClassification.from_pretrained(HF_REPO_ID).to(device).eval()
+    cfg = _model.config
+    num = getattr(cfg, "num_labels", None)
+    if ENV_LABELS and num and len(ENV_LABELS) == num:
+        _labels = ENV_LABELS
+    else:
+        id2label = getattr(cfg, "id2label", None)
+        if isinstance(id2label, dict) and num is not None:
+            _labels = [id2label.get(i) or id2label.get(str(i)) or f"LABEL_{i}" for i in range(num)]
+        else:
+            _labels = [f"LABEL_{i}" for i in range(num or 0)]
 
-
-def classify_emotion(text: str) -> dict:
-    load_from_hf()
-    enc = tokenizer(text, return_tensors="pt", truncation=True, max_length=256).to(device)
+def classify_local(text: str) -> Dict[str, Any]:
+    _load_local_model()
+    device = next(_model.parameters()).device
+    enc = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256).to(device)
     with torch.no_grad():
-        logits = model(**enc).logits[0]
+        logits = _model(**enc).logits[0]
     probs = torch.softmax(logits, dim=-1).tolist()
-    resolved = resolve_labels()
-    dist = {resolved[i]: float(probs[i]) for i in range(len(probs))}
+    dist = {_labels[i]: float(probs[i]) for i in range(len(probs))}
     top = max(dist, key=dist.get)
     return {"top_label": top, "confidence": dist[top], "probs": dist}
 
-FORMAT_PROMPT = ChatPromptTemplate.from_template(
-    "Summarize this emotion classification for a user.\n"
-    "Label: {label}\nConfidence: {confidence}\n"
-    "Return one short sentence."
-)
+def classify_remote(text: str) -> Dict[str, Any]:
+    if not EMOTION_URL:
+        raise EnvironmentError("EMOTION_URL is not set")
+    r = requests.post(EMOTION_URL, json={"text": text}, timeout=20)
+    r.raise_for_status()
+    data = r.json()
+    return {
+        "top_label": data["top_label"],
+        "confidence": float(data["confidence"]),
+        "probs": data["probs"],
+    }
+
+def classify_emotion(text: str) -> Dict[str, Any]:
+    return classify_remote(text) if SERVICE_MODE == "remote" else classify_local(text)
 
 def tool_fn(text: str) -> str:
-    res = classify_emotion(text)  # {"top_label": ..., "confidence": ..., "probs": {...}}
-    llm = ChatOpenAI(model=os.getenv("LLM_MODEL","gpt-4o-mini"), temperature=0)
-    msg = FORMAT_PROMPT.invoke({"label": res["top_label"], "confidence": res["confidence"]})
-    return llm.invoke(msg).content
-
+    res = classify_emotion(text)
+    if os.getenv("OPENAI_API_KEY"):
+        llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
+        msg = FORMAT_PROMPT.invoke({"label": res["top_label"], "confidence": res["confidence"]})
+        summary = llm.invoke(msg).content
+    else:
+        summary = f"{res['top_label']} (confidence={res['confidence']:.3f})"
+    return json.dumps({"summary": summary, **res}, ensure_ascii=False)
 
 emotion_tool = StructuredTool.from_function(
     name="emotion_classifier",
-    description=(
-        "Useful when the user wants to analyze the emotion, sentiment, feeling, or tone "
-        "of a provided text snippet. Input must be the snippet itself "
-        "(e.g., 'I love my mom'). Do NOT use for student facts, biography, or achievements requests."
-    ),
+    description="Analyze the emotion/sentiment/tone of a text snippet. Use for emotional content, not student facts.",
     func=tool_fn,
     args_schema=EmotionArgs,
 )

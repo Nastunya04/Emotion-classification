@@ -1,0 +1,76 @@
+version: "3.9"
+
+services:
+  rag-ingest:
+    build:
+      context: .
+      dockerfile: services/rag_ingest/Dockerfile
+    container_name: rag-ingest
+    volumes:
+      - ./.faiss_vs:/app/.faiss_vs
+      - ./data:/app/data
+    environment:
+      - DATA_DIR=/app/data/student_profile
+      - VECTOR_DIR=${VECTOR_DIR}
+      - INDEX_NAME=${INDEX_NAME}
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
+      - HF_EMBED_MODEL=${HF_EMBED_MODEL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: "no"
+
+  rag-api:
+    build:
+      context: .
+      dockerfile: services/rag_api/Dockerfile
+    container_name: rag-api
+    depends_on:
+      - rag-ingest
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./.faiss_vs:/app/.faiss_vs
+    environment:
+      - SERVICE_MODE=local
+      - VECTOR_DIR=${VECTOR_DIR}
+      - INDEX_NAME=${INDEX_NAME}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EMBEDDINGS_PROVIDER=${EMBEDDINGS_PROVIDER}
+      - EMBEDDINGS_MODEL=${EMBEDDINGS_MODEL}
+      - HF_EMBED_MODEL=${HF_EMBED_MODEL}
+
+  emotion-api:
+    build:
+      context: .
+      dockerfile: services/emotion_api/Dockerfile
+    container_name: emotion-api
+    ports:
+      - "8003:8000"
+    environment:
+      - SERVICE_MODE=local
+      - HF_REPO_ID=${HF_REPO_ID}
+      - LLM_MODEL=${LLM_MODEL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+  agent-api:
+    build:
+      context: .
+      dockerfile: services/agent_api/Dockerfile
+    volumes:
+      - ./.faiss_vs:/app/.faiss_vs
+    container_name: agent-api
+    depends_on:
+      - rag-api
+      - emotion-api
+    ports:
+      - "8001:8000"
+    environment:
+      - SERVICE_MODE=${SERVICE_MODE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - RAG_URL=${RAG_URL}
+      - EMOTION_URL=${EMOTION_URL}
+
+networks:
+  default:
+    name: agent-net
