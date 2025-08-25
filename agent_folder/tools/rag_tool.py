@@ -94,7 +94,7 @@ def rag_local(question: str) -> Dict[str, Any]:
 def rag_remote(question: str) -> Dict[str, Any]:
     if not RAG_URL:
         return {"answer": "RAG_URL is not configured.", "sources": []}
-    resp = requests.post(RAG_URL, json={"question": question}, timeout=20)
+    resp = requests.post(RAG_URL, json={"question": question}, timeout=120)
     resp.raise_for_status()
     data = resp.json()
     return {"answer": data.get("answer", ""), "sources": data.get("sources", [])}

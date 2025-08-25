@@ -40,6 +40,9 @@ def get_session_history(session_id: str) -> InMemoryChatMessageHistory:
         _session_store[session_id] = InMemoryChatMessageHistory()
     return _session_store[session_id]
 
+def clear_session_history(session_id: str) -> None:
+    _session_store.pop(session_id, None)
+
 def build_agent_with_history() -> RunnableWithMessageHistory:
     base = build_agent()
     return RunnableWithMessageHistory(

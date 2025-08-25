@@ -36,6 +36,7 @@ def _load_local_model():
         return
     if not HF_REPO_ID:
         raise EnvironmentError("HF_REPO_ID is not set")
+    print(f"[emotion] Loading local model from {HF_REPO_ID}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     _tokenizer = AutoTokenizer.from_pretrained(HF_REPO_ID)
     _model = AutoModelForSequenceClassification.from_pretrained(HF_REPO_ID).to(device).eval()
@@ -49,8 +50,10 @@ def _load_local_model():
             _labels = [id2label.get(i) or id2label.get(str(i)) or f"LABEL_{i}" for i in range(num)]
         else:
             _labels = [f"LABEL_{i}" for i in range(num or 0)]
+    print(f"[emotion] Model loaded. Labels: {_labels}")
 
 def classify_local(text: str) -> Dict[str, Any]:
+    print(f"[emotion] classify_local called with text='{text}'")
     _load_local_model()
     device = next(_model.parameters()).device
     enc = _tokenizer(text, return_tensors="pt", truncation=True, max_length=256).to(device)
@@ -59,14 +62,18 @@ def classify_local(text: str) -> Dict[str, Any]:
     probs = torch.softmax(logits, dim=-1).tolist()
     dist = {_labels[i]: float(probs[i]) for i in range(len(probs))}
     top = max(dist, key=dist.get)
+    print(f"[emotion] classify_local result: top={top}, confidence={dist[top]:.3f}")
     return {"top_label": top, "confidence": dist[top], "probs": dist}
 
 def classify_remote(text: str) -> Dict[str, Any]:
     if not EMOTION_URL:
         raise EnvironmentError("EMOTION_URL is not set")
-    r = requests.post(EMOTION_URL, json={"text": text}, timeout=20)
+    print(f"[emotion] classify_remote POST to {EMOTION_URL} with text='{text}'")
+    r = requests.post(EMOTION_URL, json={"text": text}, timeout=120)
+    print(f"[emotion] classify_remote response status={r.status_code}")
     r.raise_for_status()
     data = r.json()
+    print(f"[emotion] classify_remote result: {data}")
     return {
         "top_label": data["top_label"],
         "confidence": float(data["confidence"]),
@@ -74,17 +81,22 @@ def classify_remote(text: str) -> Dict[str, Any]:
     }
 
 def classify_emotion(text: str) -> Dict[str, Any]:
+    print(f"[emotion] classify_emotion SERVICE_MODE={SERVICE_MODE}")
     return classify_remote(text) if SERVICE_MODE == "remote" else classify_local(text)
 
 def tool_fn(text: str) -> str:
+    print(f"[emotion] tool_fn invoked with text='{text}'")
     res = classify_emotion(text)
     if os.getenv("OPENAI_API_KEY"):
+        print(f"[emotion] Summarizing with LLM={LLM_MODEL}")
         llm = ChatOpenAI(model=LLM_MODEL, temperature=0)
         msg = FORMAT_PROMPT.invoke({"label": res["top_label"], "confidence": res["confidence"]})
         summary = llm.invoke(msg).content
     else:
         summary = f"{res['top_label']} (confidence={res['confidence']:.3f})"
-    return json.dumps({"summary": summary, **res}, ensure_ascii=False)
+    out = json.dumps({"summary": summary, **res}, ensure_ascii=False)
+    print(f"[emotion] tool_fn output={out}")
+    return out
 
 emotion_tool = StructuredTool.from_function(
     name="emotion_classifier",

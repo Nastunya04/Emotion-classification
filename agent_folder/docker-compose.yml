@@ -71,6 +71,37 @@ services:
       - RAG_URL=${RAG_URL}
       - EMOTION_URL=${EMOTION_URL}
 
+  telegram-mcp:
+    build:
+      context: .
+      dockerfile: services/mcp_telegram/Dockerfile.mcp
+    container_name: telegram-mcp
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - HOST=${HOST}
+      - PORT=${PORT}
+      - HTTP_PATH=${HTTP_PATH}
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  telegram-agent-bridge:
+    build:
+      context: .
+      dockerfile: services/mcp_telegram/Dockerfile.bridge
+    container_name: telegram-agent-bridge
+    depends_on:
+      - telegram-mcp
+      - agent-api
+    environment:
+      - TELEGRAM_MCP_URL=${TELEGRAM_MCP_URL}
+      - AGENT_API_URL=${AGENT_API_URL}
+      - AGENT_CHAT_PATH=${AGENT_CHAT_PATH}
+      - AGENT_MEM_PATH=${AGENT_MEM_PATH}
+      - AGENT_CLEAR_PATH=${AGENT_CLEAR_PATH}
+      - TELEGRAM_POLL_TIMEOUT=${TELEGRAM_POLL_TIMEOUT}
+    restart: unless-stopped
+
 networks:
   default:
     name: agent-net
