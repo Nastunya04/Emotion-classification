@@ -12,10 +12,9 @@ if repo_id is None:
 tokenizer = AutoTokenizer.from_pretrained(repo_id)
 config = AutoConfig.from_pretrained(repo_id)
 
-labels = ['sadness', 'joy', 'love', 'anger', 'fear', 'surprise']
-config.id2label = {i: l for i, l in enumerate(labels)}
-config.label2id = {l: i for i, l in enumerate(labels)}
-config.num_labels = len(labels)
+id2label = config.id2label
+label2id = config.label2id
+labels = list(label2id.keys())
 
 model = AutoModelForSequenceClassification.from_pretrained(repo_id, config=config)
 model.eval()

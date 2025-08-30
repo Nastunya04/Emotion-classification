@@ -17,7 +17,6 @@ SERVICE_MODE: str = (os.getenv("SERVICE_MODE") or "local").lower()
 EMOTION_URL: Optional[str] = os.getenv("EMOTION_URL")
 LLM_MODEL: str = os.getenv("LLM_MODEL")
 HF_REPO_ID: Optional[str] = os.getenv("HF_REPO_ID")
-ENV_LABELS = [s.strip() for s in (os.getenv("EMOTION_LABELS") or "").split(",") if s.strip()]
 
 FORMAT_PROMPT = ChatPromptTemplate.from_template(
     "Summarize this emotion classification for a user.\nLabel: {label}\nConfidence: {confidence}\nReturn one short sentence."
@@ -42,14 +41,11 @@ def _load_local_model():
     _model = AutoModelForSequenceClassification.from_pretrained(HF_REPO_ID).to(device).eval()
     cfg = _model.config
     num = getattr(cfg, "num_labels", None)
-    if ENV_LABELS and num and len(ENV_LABELS) == num:
-        _labels = ENV_LABELS
+    id2label = getattr(cfg, "id2label", None)
+    if isinstance(id2label, dict) and num is not None:
+        _labels = [id2label.get(i) or id2label.get(str(i)) or f"LABEL_{i}" for i in range(num)]
     else:
-        id2label = getattr(cfg, "id2label", None)
-        if isinstance(id2label, dict) and num is not None:
-            _labels = [id2label.get(i) or id2label.get(str(i)) or f"LABEL_{i}" for i in range(num)]
-        else:
-            _labels = [f"LABEL_{i}" for i in range(num or 0)]
+        _labels = [f"LABEL_{i}" for i in range(num or 0)]
     print(f"[emotion] Model loaded. Labels: {_labels}")
 
 def classify_local(text: str) -> Dict[str, Any]:
