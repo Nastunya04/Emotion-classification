@@ -2,8 +2,12 @@
 
 A unified agent that combines **emotion classification** and **retrieval-augmented generation**, exposed as FastAPI microservices and integrated with Telegram via MCP.
 
+A unified agent that combines emotion classification and retrieval-augmented generation, exposed as FastAPI microservices and integrated with Telegram via MCP.
+
 - **English Emotion Classifier** — a fine-tuned BERT model for 6 emotions: *joy, sadness, anger, fear, love, surprise*.  
-- **Ukrainian Emotion Classifier (bonus)** — an additional XLM-R model trained on a Ukrainian emotion dataset for 6 emotions: *joy, fear, anger, sadness, disgust, surprise*
+  Weights are available on Hugging Face: [nastiadynia/emot_classification](https://huggingface.co/nastiadynia/emot_classification)
+- **Ukrainian Emotion Classifier (bonus)** — an additional XLM-R model trained on a Ukrainian emotion dataset for 6 emotions: *joy, fear, anger, sadness, disgust, surprise*.  
+  Weights are available on Hugging Face: [nastiadynia/ukrainian_emot_classification](https://huggingface.co/nastiadynia/ukrainian_emot_classification)
 - **RAG Component** — builds a FAISS index from `data/student_profile/` and answers factual questions about the student using only that text.
 - **Unified Agent** — LangChain tool-selection between EN/UA classifiers and RAG. Deployed as modular services: `agent-api`, `emotion-api`, `rag-api`, plus Telegram bridge via MCP.
 
