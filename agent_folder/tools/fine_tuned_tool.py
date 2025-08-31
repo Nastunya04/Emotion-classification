@@ -65,7 +65,7 @@ def classify_remote(text: str) -> Dict[str, Any]:
     if not EMOTION_URL:
         raise EnvironmentError("EMOTION_URL is not set")
     print(f"[emotion] classify_remote POST to {EMOTION_URL} with text='{text}'")
-    r = requests.post(EMOTION_URL, json={"text": text}, timeout=120)
+    r = requests.post(EMOTION_URL, json={"text": text}, timeout=1000)
     print(f"[emotion] classify_remote response status={r.status_code}")
     r.raise_for_status()
     data = r.json()

@@ -49,6 +49,7 @@ services:
     environment:
       - SERVICE_MODE=local
       - HF_REPO_ID=${HF_REPO_ID}
+      - UKR_MODEL=${UKR_MODEL}
       - LLM_MODEL=${LLM_MODEL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
 
@@ -70,6 +71,9 @@ services:
       - LLM_MODEL=${LLM_MODEL}
       - RAG_URL=${RAG_URL}
       - EMOTION_URL=${EMOTION_URL}
+      - EMOTION_URL_UKR=${EMOTION_URL_UKR}
+      - UKR_MODEL=${UKR_MODEL}
+      - HF_REPO_ID=${HF_REPO_ID}
 
   telegram-mcp:
     build:

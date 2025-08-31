@@ -5,23 +5,17 @@ from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 load_dotenv()
 
-PROVIDER = (os.getenv("EMBEDDINGS_PROVIDER") or "openai").lower()
-EMB_MODEL = os.getenv("EMBEDDINGS_MODEL")
+EMB_MODEL = os.getenv("EMBEDDINGS_MODEL") or "text-embedding-3-large"
 DATA_DIR = os.getenv("DATA_DIR")
 VECTOR_DIR = os.getenv("VECTOR_DIR")
 INDEX_NAME = os.getenv("INDEX_NAME")
 INDEX_PATH = os.path.join(VECTOR_DIR, INDEX_NAME)
 
 def get_embeddings():
-    if PROVIDER == "openai":
-        return OpenAIEmbeddings(model=EMB_MODEL)
-    return HuggingFaceEmbeddings(
-        model_name=os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    )
+    return OpenAIEmbeddings(model=EMB_MODEL)
 
 def load_txt_docs():
     paths = sorted(glob(os.path.join(DATA_DIR, "**/*.txt"), recursive=True))
@@ -44,15 +38,12 @@ def build_index():
     if not docs:
         print("[ERROR] No documents found. Exiting.")
         return
-
     print(f"[INFO] Splitting {len(docs)} document(s) into chunks...")
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
     chunks = splitter.split_documents(docs)
     print(f"[INFO] Created {len(chunks)} chunk(s) total.")
-
-    print(f"[INFO] Using embeddings provider='{PROVIDER}' model='{EMB_MODEL}'")
+    print(f"[INFO] Using embeddings provider='openai' model='{EMB_MODEL}'")
     embeddings = get_embeddings()
-
     print("[INFO] Building FAISS index...")
     vs = FAISS.from_documents(chunks, embeddings)
     vs.save_local(INDEX_PATH)
