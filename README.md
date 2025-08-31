@@ -13,36 +13,40 @@ A unified agent that combines emotion classification and retrieval-augmented gen
 
 ## Project Structure
 ```
-agent_folder/
-├── agent/                     # Core agent logic (LangChain tools, CLI)
-│   ├── agent.py               # Builds agent with tool-selection rules + memory
-│   └── cli.py                 # CLI interface for the agent
-│
-├── data/student_profile/      # Source texts for RAG (student biography)
-│   └── profile.txt
-│
-├── emotion_classification_model/   # Standalone test scripts for models
-│   ├── try_running_the_english_model.py
-│   └── try_running_the_ukrainian_model.py
-│
-├── rag/                       # RAG index builder
-│   └── ingest.py              # Loads .txt files, builds FAISS index
-│
-├── services/                  # FastAPI microservices
-│   ├── agent_api/             # Unified agent API (chat, mem, clear)
-│   ├── emotion_api/           # Emotion classification API (EN + UA)
-│   ├── rag_api/               # RAG API (answers factual questions)
-│   ├── rag_ingest/            # Ingestion service for index build
-│   └── mcp_telegram/          # Telegram bridge via MCP
-│
-├── tools/                     # LangChain tool wrappers
-│   ├── fine_tuned_tool.py     # English classifier tool
-│   ├── ukr_fine_tuned_tool.py # Ukrainian classifier tool
-│   └── rag_tool.py            # RAG tool
-│
-├── docker-compose.yml         # Multi-service setup
-├── requirements.txt           # Python dependencies
-└── .env                       # Environment variables
+├── agent_folder/
+	└── agent/                     # Core agent logic (LangChain tools, CLI)
+	│   ├── agent.py               # Builds agent with tool-selection rules + memory
+	│   └── cli.py                 # CLI interface for the agent
+	│
+	├── data/student_profile/      # Source texts for RAG (student biography)
+	│   └── profile.txt
+	│
+	├── emotion_classification_model/   # Standalone test scripts for models
+	│   ├── try_running_the_english_model.py
+	│   └── try_running_the_ukrainian_model.py
+	│
+	├── rag/                       # RAG index builder
+	│   └── ingest.py              # Loads .txt files, builds FAISS index
+	│
+	├── services/                  # FastAPI microservices
+	│   ├── agent_api/             # Unified agent API (chat, mem, clear)
+	│   ├── emotion_api/           # Emotion classification API (EN + UA)
+	│   ├── rag_api/               # RAG API (answers factual questions)
+	│   ├── rag_ingest/            # Ingestion service for index build
+	│   └── mcp_telegram/          # Telegram bridge via MCP
+	│
+	├── tools/                     # LangChain tool wrappers
+	│   ├── fine_tuned_tool.py     # English classifier tool
+	│   ├── ukr_fine_tuned_tool.py # Ukrainian classifier tool
+	│   └── rag_tool.py            # RAG tool
+	│
+	├── docker-compose.yml         # Multi-service setup
+	├── requirements.txt           # Python dependencies
+	└── .env                       # Environment variables
+├── training_models.ipynb      # Jupyter notebook with training & evaluation experiments
+├── README.md                  # Project documentation
+├── LICENSE
+├── .gitignore
 ```
 ## Setup
 
