@@ -31,8 +31,10 @@ def unwrap(resp: Any) -> Any:
     if callable(md): return md()
     mdj = getattr(item, "model_dump_json", None)
     if callable(mdj):
-        try: return json.loads(mdj())
-        except Exception: return mdj()
+        try:
+            return json.loads(mdj())
+        except Exception:
+            return mdj()
     return item
 
 def extract_updates(obj: Any):
