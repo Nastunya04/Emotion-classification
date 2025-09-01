@@ -114,32 +114,19 @@ In this mode everything is started automatically via `docker-compose.yml`, inclu
 docker compose up --build
 ```
 After startup, the following services will be available:
-- **rag-api**
-  
-	•	`POST` http://localhost:8002/ask — answers factual questions about the student (RAG).
-- **emotion-api**
-  
-	•	`POST` http://localhost:8003/classify — English emotion classifier (BERT).
-
-	•	`POST` http://localhost:8003/classify_ukr — Ukrainian emotion classifier (XLM-R).
-- **agent-api**
-  
-	•	`POST` http://localhost:8001/chat — single entry point, agent automatically selects the right tool.
-
-	•	`GET`  http://localhost:8001/mem — get conversation memory.
-
-	•	`POST` http://localhost:8001/clear — clear conversation memory.
-
-	•	`GET`  http://localhost:8001/health — health check.
-
+| Service     | Method | Path            | Description                                   | Test UI                    |
+|-------------|--------|-----------------|-----------------------------------------------|----------------------------|
+| **rag-api** | GET    | `/health`       | Health check                                  | [http://localhost:8002/docs](http://localhost:8002/docs) |
+|             | POST   | `/ask`          | Answer factual questions (RAG)                |                            |
+| **emotion-api** | GET    | `/health`   | Health check                                  | [http://localhost:8003/docs](http://localhost:8003/docs) |
+|             | POST   | `/classify`     | English emotion classification (BERT)         |                            |
+|             | POST   | `/classify_ukr` | Ukrainian emotion classification (XLM-R)      |                            |
+| **agent-api** | GET    | `/health`     | Health check                                  | [http://localhost:8001/docs](http://localhost:8001/docs) |
+|             | POST   | `/chat`         | Unified agent (auto-selects tool)             |                            |
+|             | GET    | `/mem`          | Conversation memory (defaults to `default`)   |                            |
+|             | POST   | `/clear`        | Clear conversation memory                     |                            |
 If you configure `TELEGRAM_BOT_TOKEN` in `.env`, the **telegram-mcp** and **telegram-agent-bridge** services will also run. They connect `Telegram → MCP → agent-api`, so you can chat with the bot directly in Telegram.
 
-#### Health checks
-```bash
-curl http://localhost:8002/health   # rag-api
-curl http://localhost:8003/health   # emotion-api
-curl http://localhost:8001/health   # agent-api
-```
 
 ### B) Local dev
 Use this mode if you want to run modules directly from Python.
